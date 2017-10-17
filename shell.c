@@ -12,10 +12,12 @@
 void setupCommand(char* command);
 char* removeSpace(char* string);
 int executeCommand(int returnValue, int isFirst, int test);
+void clean(int i);
 
 char *args[256];
 pid_t pid;
 char str[256];
+int count = 0;
 
 int main(int argc, char const *argv[]) {
     printf("C Shell. Type 'exit' to quit.\n");
@@ -23,6 +25,9 @@ int main(int argc, char const *argv[]) {
         printf("$>");
         fflush(NULL); //print prompt and flush everything out.
 
+        int returnValue = 0; //will be used for previous command value, 0 initially.
+        int isFirst = 1; //check on if command is first in sequence (piping).
+        
         //char *fgets(char *str, int n, FILE *stream);
         if (!fgets(str, 256, stdin)){
             return 0; //end program if no command entered.
@@ -35,22 +40,35 @@ int main(int argc, char const *argv[]) {
         while (pipe != NULL){ //While there exists another pipe.
             *pipe = '\0'; //set the current location to null terminator.
             setupCommand(command);
-            int returnValue = 0; //will be used for previous command value, 0 initially.
-            int isFirst = 1; //check on if command is first in sequence (piping).
+
             //check if any args
             if (args[0] != NULL){
                 if (strcmp(args[0], "exit") == 0){
                     //if exit is typed.
                     exit(0);
                 }
+                count = count + 1; // new process created
                 returnValue = executeCommand(returnValue, isFirst, 0);
             } else {
                 returnValue = 0;
             }
-
-
+            command = pipe + 1; //increment
+            pipe = strchr(command, '|'); //find next
+            returnValue = 0;
         }
 
+        //deal with last command
+        setupCommand(command);
+        if (args[0] != NULL){
+            if (strcmp(args[0], "exit") == 0){
+                exit(0);
+            }
+            returnValue = executeCommand(returnValue, isFirst, 1);
+        } else {
+            returnValue = 0;
+        }
+        clean(count);
+        count = 0;
     }
     return 0;
 }
@@ -87,7 +105,60 @@ void setupCommand(char* command){
 
 }
 
+void clean(int i){
+    for (int k = 0; k < i; k++){
+        wait(NULL);
+    }
+}
+
 int executeCommand(int returnValue, int isFirst, int test){
     //how to handle pipe?
+    //http://codewiki.wikidot.com/c:system-calls:dup2
+    //dup2 is a system call similar to dup in that it duplicates one file descriptor,
+    //making them aliases, and then deleting the old file descriptor. This becomes very
+    //useful when attempting to redirect output, as it automatically takes care of closing
+    //the old file descriptor, performing the redirection in one elegant command. For example,
+    //if you wanted to redirect standard output to a file, then you would simply call dup2,
+    //providing the open file descriptor for the file as the first command and 1 (standard output)
+    //as the second command.
+
+    // int file = open("myfile.txt", O_APPEND | O_WRONLY);
+    // f(dup2(file,1) < 0)
+
+
+    int pipes[2];
+    pipe(pipes);
+    pid = fork();
+    if (pid == 0) { //child process
+        if (isFirst == 0 && test == 0 && returnValue != 0){
+            dup2(returnValue, STDIN_FILENO);
+            dup2(pipes[1], STDOUT_FILENO); //writing pipe
+        }
+        else if (returnValue == 0 && isFirst == 1 && test == 0){
+            dup2(pipes[1], STDOUT_FILENO); //writing pipe
+        }
+        else {
+            dup2(returnValue, STDIN_FILENO);
+        }
+
+        //run command
+        int run = execvp(args[0], args);
+        if (run == -1) {
+            _exit(2);
+        }
+    }
+
+    // close if needed
+    if (returnValue != 0){
+        close(returnValue);
+    }
+
+    close(pipes[1]); //no more writing to be done.
+
+    if (test == 1){
+        close(pipes[0]); //nothing more to be read.
+    }
+
+    return pipes[0]; //fix
 
 }
