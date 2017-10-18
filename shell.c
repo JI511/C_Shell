@@ -22,12 +22,12 @@ int count = 0;
 int main(int argc, char const *argv[]) {
     printf("C Shell. Type 'exit' to quit.\n");
     while (1){
-        printf("$>");
+        printf("$> ");
         fflush(NULL); //print prompt and flush everything out.
 
         int returnValue = 0; //will be used for previous command value, 0 initially.
-        int isFirst = 1; //check on if command is first in sequence (piping).
-        
+        int isFirst = 1; //check if command is first in sequence (piping).
+
         //char *fgets(char *str, int n, FILE *stream);
         if (!fgets(str, 256, stdin)){
             return 0; //end program if no command entered.
@@ -52,12 +52,12 @@ int main(int argc, char const *argv[]) {
             } else {
                 returnValue = 0;
             }
-            command = pipe + 1; //increment
+            command = pipe + 1; //increment to get next command.
             pipe = strchr(command, '|'); //find next
-            returnValue = 0;
+            isFirst = 0;
         }
 
-        //deal with last command
+        //deal with last command (or only command if no piping).
         setupCommand(command);
         if (args[0] != NULL){
             if (strcmp(args[0], "exit") == 0){
@@ -67,8 +67,9 @@ int main(int argc, char const *argv[]) {
         } else {
             returnValue = 0;
         }
-        clean(count);
+        clean(count); //make sure all processes are terminated.
         count = 0;
+        fflush(NULL);
     }
     return 0;
 }
@@ -82,9 +83,11 @@ char* removeSpace(char* string){
 }
 
 void setupCommand(char* command){
-    command = removeSpace(command); //get rid of any leading white space
-    char* space = strchr(command, ' ');
     int count = 0;
+
+    command = removeSpace(command); //get rid of any leading white space
+    char* space = strchr(command, ' '); //find end of command.
+
     while (space != NULL) { //While there exists another space
         space[0] = '\0';
         args[count] = command;
@@ -92,7 +95,7 @@ void setupCommand(char* command){
         command = removeSpace(space + 1); //get new command (next param)
         space = strchr(command, ' '); //reset next space
     }
-    printf("%c", *command);
+    //printf("COMMAND: %s\n", command);
     if (command[0] != '\0'){
         args[count] = command;
         space = strchr(command, '\n');
