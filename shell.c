@@ -132,6 +132,7 @@ int executeCommand(int returnValue, int isFirst, int test){
     int pipes[2];
     pipe(pipes);
     pid = fork();
+    int status;
     if (pid == 0) { //child process
         if (isFirst == 0 && test == 0 && returnValue != 0){
             dup2(returnValue, STDIN_FILENO);
@@ -149,6 +150,8 @@ int executeCommand(int returnValue, int isFirst, int test){
         if (run == -1) {
             _exit(2);
         }
+    } else {
+        waitpid(pid, &status, 0);
     }
 
     // close if needed
