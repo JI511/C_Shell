@@ -151,7 +151,7 @@ int executeCommand(int returnValue, int isFirst, int test){
             _exit(2);
         }
     } else {
-        waitpid(pid, &status, 0);
+        waitpid(pid, &status, 0); //wait for child to finish!!
     }
 
     // close if needed
